@@ -1,5 +1,3 @@
-// script.js
-
 // Глобальные настройки
 const BPM = 120;
 const beatDuration = (60 / BPM) * 1000;
@@ -8,7 +6,7 @@ const loopDuration = beatDuration * 4;
 let isPlaying = false;
 let globalTimer = null;
 const activeSounds = {};
-let currentVolume = 1; // Громкость по умолчанию
+let currentVolume = 1;
 
 // Карта аудио и путей
 const audioMap = {
@@ -30,21 +28,21 @@ const audioMap = {
 };
 
 const audioPaths = {
-    kickButton1: '/3311/access/sounds/kick1.mp3',
-    kickButton2: '/3311/access/sounds/kick2.mp3',
-    kickButton3: '/3311/access/sounds/kick3.mp3',
-    melodyButton1: '/3311/access/sounds/melody1.mp3',
-    melodyButton2: '/3311/access/sounds/melody2.mp3',
-    melodyButton3: '/3311/access/sounds/melody3.mp3',
-    melodyTopButton1: '/3311/access/sounds/melody1.mp3',
-    melodyTopButton2: '/3311/access/sounds/melody2.mp3',
-    melodyTopButton3: '/3311/access/sounds/melody3.mp3',
-    thirdButton1: '/3311/access/sounds/third1.mp3',
-    thirdButton2: '/3311/access/sounds/third2.mp3',
-    thirdButton3: '/3311/access/sounds/third3.mp3',
-    fourthButton1: '/3311/access/sounds/fourth1.mp3',
-    fourthButton2: '/3311/access/sounds/fourth2.mp3',
-    fourthButton3: '/3311/access/sounds/fourth3.mp3'
+    kickButton1: 'access/sounds/kick1.mp3',
+    kickButton2: 'access/sounds/kick2.mp3',
+    kickButton3: 'access/sounds/kick3.mp3',
+    melodyButton1: 'access/sounds/melody1.mp3',
+    melodyButton2: 'access/sounds/melody2.mp3',
+    melodyButton3: 'access/sounds/melody3.mp3',
+    melodyTopButton1: 'access/sounds/melodyTop1.mp3',
+    melodyTopButton2: 'access/sounds/melodyTop2.mp3',
+    melodyTopButton3: 'access/sounds/melodyTop3.mp3',
+    thirdButton1: 'access/sounds/third1.mp3',
+    thirdButton2: 'access/sounds/third2.mp3',
+    thirdButton3: 'access/sounds/third3.mp3',
+    fourthButton1: 'access/sounds/fourth1.mp3',
+    fourthButton2: 'access/sounds/fourth2.mp3',
+    fourthButton3: 'access/sounds/fourth3.mp3'
 };
 
 // Настройка записи
@@ -76,11 +74,9 @@ mediaRecorder.onstop = function() {
     sendAudioToUser(blob);
 };
 
-// Отправка в Telegram
 function sendAudioToUser(blob) {
     const chatId = window.Telegram.WebApp.initDataUnsafe.user.id;
     const botToken = '8053491578:AAGSIrd3qdvzGh-ZU4SmTJjsKOMHmcKNr3c'; // Замените на ваш токен
-
     const formData = new FormData();
     formData.append('chat_id', chatId);
     formData.append('audio', blob, 'recording.wav');
@@ -105,7 +101,7 @@ function sendAudioToUser(blob) {
         });
 }
 
-// Управление глобальным таймером
+// Управление таймером
 function startGlobalTimer() {
     if (!isPlaying) {
         isPlaying = true;
@@ -137,27 +133,32 @@ function playActiveSounds() {
 
 // Переключение изображений
 function toggleButtonImage(button) {
-    const isPressed = button.classList.contains('pressed');
-    const baseSrc = button.src.split('_')[0];
-    button.src = isPressed ? `${baseSrc}_pressed.png` : `${baseSrc}_normal.png`;
+    if (button.src.endsWith('_normal.png')) {
+        button.src = button.src.replace('_normal.png', '_pressed.png');
+    } else if (button.src.endsWith('_pressed.png')) {
+        button.src = button.src.replace('_pressed.png', '_normal.png');
+    }
 }
 
 // Плавное затухание
-function fadeOutSound(sound, duration = 500) {
+function fadeOutSound(sound) {
     if (!sound) return;
-    let volume = sound.volume;
-    const step = volume / (duration / 50);
-    const fadeInterval = setInterval(() => {
-        volume -= step;
-        if (volume <= 0) {
+    let initialVolume = sound.volume;
+    let fadeDuration = 500; // ms
+    let startTime = Date.now();
+    let interval = setInterval(() => {
+        let elapsed = Date.now() - startTime;
+        let newVolume = initialVolume - (elapsed / fadeDuration) * initialVolume;
+        if (newVolume <= 0) {
+            sound.volume = 0;
             sound.pause();
             sound.currentTime = 0;
             sound.volume = currentVolume;
-            clearInterval(fadeInterval);
+            clearInterval(interval);
         } else {
-            sound.volume = volume;
+            sound.volume = newVolume;
         }
-    }, 50);
+    }, 10);
 }
 
 // Обновление громкости
@@ -172,10 +173,11 @@ function buttonClickHandler(event) {
     const button = event.currentTarget;
     const buttonId = button.id;
 
-    const controlButtons = ["recordButton", "playButton", "stopButton"];
+    const controlButtons = ["recordButton", "playButton", "stopButton", "pauseButton"];
     if (controlButtons.includes(buttonId)) {
         if (buttonId === "recordButton") {
             button.classList.toggle('pressed');
+            toggleButtonImage(button);
             if (button.classList.contains('pressed')) {
                 mediaRecorder.start();
                 console.log("Recording started");
@@ -205,6 +207,8 @@ function buttonClickHandler(event) {
                     toggleButtonImage(recordBtn);
                 }
             }
+        } else if (buttonId === "pauseButton") {
+            // Логика паузы, если нужна
         }
         return;
     }

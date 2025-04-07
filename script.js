@@ -159,10 +159,11 @@ function playActiveSounds() {
 
 // Переключение изображений
 function toggleButtonImage(button) {
+    const baseSrc = button.src.split('_normal.png')[0];
     if (button.classList.contains('pressed')) {
-        button.src = 'access/p/fourth_pressed.png';
+        button.src = `${baseSrc}_pressed.png`;
     } else {
-        button.src = 'access/p/fourth_normal.png';
+        button.src = `${baseSrc}_normal.png`;
     }
 }
 

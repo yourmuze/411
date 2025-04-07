@@ -7,6 +7,7 @@ body {
     margin: 0;
     padding: 0;
     display: flex;
+    flex-direction: column; /* Элементы (Top_panel и контейнеры) располагаются вертикально */
     justify-content: center;
     align-items: center;
     min-height: 100vh;
@@ -14,10 +15,10 @@ body {
 
 /* Контейнер для кнопок */
 .container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 15px;
+    display: grid; /* Используем grid вместо flex для четкой сетки */
+    grid-template-columns: repeat(3, 100px); /* 3 столбца по 100px (ширина кнопки) */
+    grid-template-rows: repeat(4, 100px); /* 4 ряда по 100px (высота кнопки) */
+    gap: 15px; /* Расстояние между кнопками */
     padding: 20px;
 }
 
@@ -42,8 +43,17 @@ body {
     100% { transform: scale(1); }
 }
 
+/* Стили для нижнего контейнера (управляющие кнопки) */
+.containerdown {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px; /* Расстояние между элементами */
+    padding: 10px;
+}
+
 /* Стили для слайдера громкости */
 #volumeSlider {
     width: 100px;
-    margin: 20px;
+    margin: 0; /* Убираем лишние отступы */
 }

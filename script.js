@@ -4,6 +4,7 @@ const beatDuration = (60 / BPM) * 1000;
 const loopDuration = beatDuration * 4;
 
 let isPlaying = false;
+let isPaused = false;
 let globalTimer = null;
 const activeSounds = {};
 let currentVolume = 1;
@@ -74,9 +75,11 @@ mediaRecorder.onstop = function() {
     sendAudioToUser(blob);
 };
 
+// Отправка в Telegram
 function sendAudioToUser(blob) {
     const chatId = window.Telegram.WebApp.initDataUnsafe.user.id;
     const botToken = '8053491578:AAGSIrd3qdvzGh-ZU4SmTJjsKOMHmcKNr3c'; // Замените на ваш токен
+
     const formData = new FormData();
     formData.append('chat_id', chatId);
     formData.append('audio', blob, 'recording.wav');
@@ -101,9 +104,9 @@ function sendAudioToUser(blob) {
         });
 }
 
-// Управление таймером
+// Управление глобальным таймером
 function startGlobalTimer() {
-    if (!isPlaying) {
+    if (!isPlaying && !isPaused) {
         isPlaying = true;
         globalTimer = setInterval(() => {
             playActiveSounds();
@@ -114,8 +117,24 @@ function startGlobalTimer() {
 function stopGlobalTimer() {
     if (isPlaying) {
         isPlaying = false;
+        isPaused = false;
         clearInterval(globalTimer);
         globalTimer = null;
+    }
+}
+
+function pauseGlobalTimer() {
+    if (isPlaying && !isPaused) {
+        isPaused = true;
+        clearInterval(globalTimer);
+        globalTimer = null;
+    }
+}
+
+function resumeGlobalTimer() {
+    if (isPaused) {
+        isPaused = false;
+        startGlobalTimer();
     }
 }
 
@@ -123,9 +142,16 @@ function playActiveSounds() {
     Object.keys(activeSounds).forEach(buttonId => {
         if (activeSounds[buttonId]) {
             const sound = audioMap[buttonId];
-            if (sound) {
+            const button = document.getElementById(buttonId);
+            if (sound && button) {
                 sound.currentTime = 0;
-                sound.play().catch(error => console.error(`Error playing ${buttonId}:`, error));
+                sound.volume = buttonId.includes('melody') ? currentVolume : currentVolume * 0.8; // Мелодии громче
+                sound.play().then(() => {
+                    button.classList.add('playing');
+                }).catch(error => console.error(`Error playing ${buttonId}:`, error));
+                sound.onended = () => {
+                    button.classList.remove('playing');
+                };
             }
         }
     });
@@ -133,18 +159,23 @@ function playActiveSounds() {
 
 // Переключение изображений
 function toggleButtonImage(button) {
-    if (button.src.endsWith('_normal.png')) {
-        button.src = button.src.replace('_normal.png', '_pressed.png');
-    } else if (button.src.endsWith('_pressed.png')) {
-        button.src = button.src.replace('_pressed.png', '_normal.png');
+    if (button.classList.contains('pressed')) {
+        button.src = 'access/p/fourth_pressed.png';
+    } else {
+        button.src = 'access/p/fourth_normal.png';
     }
 }
 
-// Плавное затухание
-function fadeOutSound(sound) {
+// Плавное затухание (не применяется к мелодиям)
+function fadeOutSound(sound, buttonId) {
     if (!sound) return;
+    if (buttonId.includes('melody')) {
+        sound.pause();
+        sound.currentTime = 0;
+        return; // Не приглушаем мелодии
+    }
     let initialVolume = sound.volume;
-    let fadeDuration = 500; // ms
+    let fadeDuration = 500;
     let startTime = Date.now();
     let interval = setInterval(() => {
         let elapsed = Date.now() - startTime;
@@ -164,7 +195,9 @@ function fadeOutSound(sound) {
 // Обновление громкости
 function updateVolume() {
     Object.values(audioMap).forEach(sound => {
-        if (sound) sound.volume = currentVolume;
+        if (sound) {
+            sound.volume = sound.id && sound.id.includes('melody') ? currentVolume : currentVolume * 0.8;
+        }
     });
 }
 
@@ -176,17 +209,26 @@ function buttonClickHandler(event) {
     const controlButtons = ["recordButton", "playButton", "stopButton", "pauseButton"];
     if (controlButtons.includes(buttonId)) {
         if (buttonId === "recordButton") {
-            button.classList.toggle('pressed');
-            toggleButtonImage(button);
-            if (button.classList.contains('pressed')) {
-                mediaRecorder.start();
-                console.log("Recording started");
-            } else {
+            if (mediaRecorder.state === "recording") {
                 mediaRecorder.stop();
+                button.classList.remove('pressed');
                 console.log("Recording stopped");
+            } else {
+                mediaRecorder.start();
+                button.classList.add('pressed');
+                console.log("Recording started");
             }
+            toggleButtonImage(button);
         } else if (buttonId === "playButton") {
-            startGlobalTimer();
+            if (!isPlaying) {
+                startGlobalTimer();
+                button.classList.add('pressed');
+                toggleButtonImage(button);
+            } else if (isPaused) {
+                resumeGlobalTimer();
+                button.classList.add('pressed');
+                toggleButtonImage(button);
+            }
         } else if (buttonId === "stopButton") {
             stopGlobalTimer();
             Object.keys(activeSounds).forEach(id => {
@@ -197,7 +239,7 @@ function buttonClickHandler(event) {
                 }
                 activeSounds[id] = false;
                 const sound = audioMap[id];
-                if (sound) fadeOutSound(sound);
+                if (sound) fadeOutSound(sound, id);
             });
             if (mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
@@ -207,8 +249,14 @@ function buttonClickHandler(event) {
                     toggleButtonImage(recordBtn);
                 }
             }
+            button.classList.add('pressed');
+            toggleButtonImage(button);
         } else if (buttonId === "pauseButton") {
-            // Логика паузы, если нужна
+            if (isPlaying && !isPaused) {
+                pauseGlobalTimer();
+                button.classList.add('pressed');
+                toggleButtonImage(button);
+            }
         }
         return;
     }
@@ -230,11 +278,12 @@ function buttonClickHandler(event) {
         const sound = audioMap[buttonId];
         if (sound) {
             sound.currentTime = 0;
+            sound.volume = buttonId.includes('melody') ? currentVolume : currentVolume * 0.8;
             sound.play().catch(error => console.error(`Error playing ${buttonId}:`, error));
         }
     } else {
         const sound = audioMap[buttonId];
-        fadeOutSound(sound);
+        fadeOutSound(sound, buttonId);
     }
 }
 
